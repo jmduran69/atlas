@@ -62,6 +62,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(meeting, { status: 201 });
   } catch (error) {
+    console.error("POST /api/meetings failed:", error);
+    
     return NextResponse.json(
       {
         status: "error",
