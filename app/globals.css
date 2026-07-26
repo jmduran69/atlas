@@ -24,3 +24,15 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+.atlas-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.85fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .atlas-grid {
+    grid-template-columns: 1fr;
+  }
+}

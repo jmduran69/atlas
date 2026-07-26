@@ -850,14 +850,7 @@ const labelStyle = {
           </p>
         </header>
 
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1.65fr) minmax(280px, 0.85fr)",
-            gap: "24px",
-            alignItems: "start",
-          }}
-        >
+        <section className="atlas-grid">
           <div>
             {currentMeeting ? (
               <div
