@@ -6,6 +6,7 @@ import { useMeetings } from "@/lib/hooks/useMeetings";
 import { deleteMeeting as deleteMeetingApi } from "@/lib/api/meetings";
 
 import ExecutiveBrief from "./components/ExecutiveBrief";
+import Upcoming from "./components/Upcoming";
 
 type MeetingType =
   | "google-meet"
@@ -88,6 +89,41 @@ function formatClockTime(date: Date) {
     minute: "2-digit",
     hour12: false,
   }).format(date);
+}
+function meetingDateOnly(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function getRelativeMeetingDate(date: string, currentDate: Date | null) {
+  if (!currentDate) return "";
+
+  const meetingDay = meetingDateOnly(date);
+  const today = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    currentDate.getDate(),
+  );
+
+  const differenceInDays = Math.round(
+    (meetingDay.getTime() - today.getTime()) / 86_400_000,
+  );
+
+  if (differenceInDays === 0) return "Today";
+  if (differenceInDays === 1) return "Tomorrow";
+
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+  }).format(meetingDay);
+}
+
+function getFullMeetingDate(date: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(meetingDateOnly(date));
 }
 
 function formatMeetingLength(minutes: number) {
@@ -1373,209 +1409,16 @@ const labelStyle = {
               </div>
             )}
 
-            <div
-              style={{
-                padding: "30px",
-                border: "1px solid #E9EDF2",
-                borderRadius: "24px",
-                backgroundColor: "#FFFFFF",
-                boxShadow: "0 12px 40px rgba(17, 24, 39, 0.045)",
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#5E6A7D",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.12em",
-                }}
-              >
-                Upcoming
-              </p>
-
-              {upcomingMeetings.length > 0 ? (
-                <div style={{ marginTop: "18px" }}>
-                  {upcomingMeetings.map((meeting, index) => {
-                    const meetingHasStarted =
-                      isMounted &&
-                      meetingStartDate(meeting).getTime() <= nowTime;
-                    const displayStatus: MeetingStatus =
-                      meeting.status === "cancelled"
-                        ? "cancelled"
-                        : meeting.status === "in-progress" || meetingHasStarted
-                          ? "in-progress"
-                          : "scheduled";
-
-                    return (
-                    <div
-                      key={meeting.id}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "82px 1fr auto",
-                        gap: "18px",
-                        alignItems: "center",
-                        padding: "20px 0",
-                        borderTop:
-                          index === 0 ? "none" : "1px solid #EEF1F4",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "18px",
-                          fontWeight: 700,
-                          color: "#1E3A5F",
-                        }}
-                      >
-                        <span style={{ display: "block" }}>
-                          {meeting.time}–{formatClockTime(meetingEndDate(meeting))}
-                        </span>
-                        <span
-                          style={{
-                            display: "block",
-                            marginTop: "5px",
-                            color: "#8792A3",
-                            fontSize: "11px",
-                            fontWeight: 800,
-                          }}
-                        >
-                          {meeting.durationMinutes} min
-                        </span>
-                      </div>
-
-                      <div>
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: "18px",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {meeting.title}
-                        </p>
-
-                        <p
-                          style={{
-                            margin: "5px 0 0",
-                            fontSize: "15px",
-                            color: "#8A93A3",
-                          }}
-                        >
-                          {meeting.subtitle}
-                        </p>
-                      </div>
-
-                      <div style={{ textAlign: "right" }}>
-                        <span
-                          style={{
-                            display: "block",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            color: "#8792A3",
-                          }}
-                        >
-                          {getMeetingTypeLabel(meeting.meetingType)}
-                        </span>
-
-                        <span
-                          style={{
-                            display: "block",
-                            marginTop: "5px",
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#A0A8B4",
-                          }}
-                        >
-                          {getCategoryLabel(meeting.category)}
-                        </span>
-
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "7px",
-                            minHeight: "32px",
-                            marginTop: "8px",
-                            padding: "0 13px",
-                            borderRadius: "999px",
-                            backgroundColor:
-                              displayStatus === "cancelled"
-                                ? "#FDECEC"
-                                : displayStatus === "in-progress"
-                                  ? "#FFF4D6"
-                                  : "#EAF8EE",
-                            color:
-                              displayStatus === "cancelled"
-                                ? "#C53030"
-                                : displayStatus === "in-progress"
-                                  ? "#A66B00"
-                                  : "#2E7D32",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {getStatusDetails(displayStatus).symbol}{" "}
-                          {getStatusDetails(displayStatus).label}
-                        </span>
-
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "flex-end",
-                            gap: "10px",
-                            marginTop: "8px",
-                          }}
-                        >
-                          <button
-                            onClick={() => openMeetingEditor(meeting)}
-                            style={rowActionStyle}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => deleteMeeting(meeting)}
-                            style={{ ...rowActionStyle, color: "#985C5C" }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p
-                  style={{
-                    margin: "22px 0 0",
-                    color: "#9CA3AF",
-                  }}
-                >
-                  Nothing else is waiting.
-                </p>
-              )}
-
-              <button
-                onClick={openMeetingCreator}
-                style={{
-                  width: "100%",
-                  marginTop: "18px",
-                  padding: "18px 0 4px",
-                  border: 0,
-                  borderTop: "1px solid #EEF1F4",
-                  backgroundColor: "transparent",
-                  color: "#31577D",
-                  fontFamily: "inherit",
-                  fontSize: "15px",
-                  fontWeight: 700,
-                  textAlign: "left",
-                  cursor: "pointer",
-                }}
-              >
-                + Add to today…
-              </button>
-            </div>
+            <Upcoming
+              meetings={upcomingMeetings}
+              now={now}
+              isMounted={isMounted}
+              onAddMeeting={openMeetingCreator}
+              onEditMeeting={(meeting) => openMeetingEditor(meeting as Meeting)}
+              onDeleteMeeting={(meeting) => deleteMeeting(meeting as Meeting)}
+              getMeetingTypeLabel={getMeetingTypeLabel}
+              getCategoryLabel={getCategoryLabel}
+            />
           </div>
 
           <aside
