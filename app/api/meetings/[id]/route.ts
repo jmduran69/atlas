@@ -21,6 +21,7 @@ export async function DELETE(
       status: 204,
     });
   } catch (error) {
+    console.error("POST /api/meetings failed:", error);
     return NextResponse.json(
       {
         message:
