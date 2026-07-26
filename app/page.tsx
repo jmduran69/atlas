@@ -469,6 +469,16 @@ const {
   useState<string | number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+  setIsMounted(true);
+  setNow(new Date());
+
+  const timer = window.setInterval(() => {
+    setNow(new Date());
+  }, 1000);
+
+  return () => window.clearInterval(timer);
+}, []);
 
   const nowTime = now?.getTime() ?? 0;
 
