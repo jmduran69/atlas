@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import {
   fetchMeetings,
   saveMeeting,
+  updateMeeting,
   type CreateDatabaseMeetingInput,
+  type UpdateDatabaseMeetingInput,
 } from "@/lib/api/meetings";
 
 import {
@@ -25,9 +27,9 @@ export function useMeetings() {
 
       const databaseMeetings = await fetchMeetings();
 
-      const loadedMeetings = databaseMeetings.map(
-        mapDatabaseMeetingToAtlas,
-      );
+      const loadedMeetings = databaseMeetings
+  .filter((meeting) => meeting.lifecycle_status !== "completed")
+  .map(mapDatabaseMeetingToAtlas);
 
       setMeetings(loadedMeetings);
     } catch (error) {
@@ -44,10 +46,21 @@ export function useMeetings() {
   }
 
   async function addMeeting(input: CreateDatabaseMeetingInput) {
-  const savedMeeting = await saveMeeting(input);
-  await reloadMeetings();
-  return savedMeeting;
-}
+    const savedMeeting = await saveMeeting(input);
+    await reloadMeetings();
+
+    return savedMeeting;
+  }
+
+  async function editMeeting(
+    id: string,
+    input: UpdateDatabaseMeetingInput,
+  ) {
+    const updatedMeeting = await updateMeeting(id, input);
+    await reloadMeetings();
+
+    return updatedMeeting;
+  }
 
   useEffect(() => {
     void reloadMeetings();
@@ -57,6 +70,7 @@ export function useMeetings() {
     meetings,
     setMeetings,
     addMeeting,
+    editMeeting,
     reloadMeetings,
     isLoadingMeetings,
     meetingsError,

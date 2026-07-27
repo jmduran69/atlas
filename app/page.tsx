@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import { useMeetings } from "@/lib/hooks/useMeetings";
+import { buildExecutiveBrief } from "@/lib/intelligence/executiveBrief";
 import { deleteMeeting as deleteMeetingApi } from "@/lib/api/meetings";
 
 import ExecutiveBrief from "./components/ExecutiveBrief";
@@ -491,6 +492,7 @@ const {
   meetings,
   setMeetings,
   addMeeting,
+  editMeeting,
   reloadMeetings,
 } = useMeetings();
   const [completed, setCompleted] = useState(initialCompleted);
@@ -518,6 +520,11 @@ const {
 
   const nowTime = now?.getTime() ?? 0;
 
+  const executiveBrief = buildExecutiveBrief(
+  meetings,
+  now ?? new Date(),
+);
+
   const sortedMeetings = [...meetings].sort(
     (first, second) =>
       meetingStartDate(first).getTime() - meetingStartDate(second).getTime(),
@@ -539,8 +546,8 @@ const {
   );
 
   const currentMeeting = !isMounted
-    ? nonCancelledMeetings[0]
-    : activeMeeting ?? nextMeeting ?? nonCancelledMeetings.at(-1);
+  ? null
+  : activeMeeting ?? nextMeeting;
 
   const upcomingMeetings = currentMeeting
     ? sortedMeetings.filter(
@@ -719,20 +726,25 @@ const {
   setFormError("");
 
   try {
-    const savedMeeting = await addMeeting({
-      title: newMeeting.title.trim(),
-      subtitle: newMeeting.purpose.trim() || "New meeting",
-      purpose:
-        newMeeting.purpose.trim() ||
-        "Clarify what success should look like before the meeting begins.",
-      objective: newMeeting.purpose.trim() || undefined,
-      meeting_date: newMeeting.date,
-      start_time: newMeeting.time,
-    });
+  const meetingInput = {
+    title: newMeeting.title.trim(),
+    subtitle: newMeeting.purpose.trim() || "New meeting",
+    purpose:
+      newMeeting.purpose.trim() ||
+      "Clarify what success should look like before the meeting begins.",
+    objective: newMeeting.purpose.trim() || undefined,
+    meeting_date: newMeeting.date,
+    start_time: newMeeting.time,
+  };
 
+  if (editingMeetingId !== null) {
+    await editMeeting(String(editingMeetingId), meetingInput);
+  } else {
+    await addMeeting(meetingInput);
+  }
 
-    closeMeetingCreator();
-  } catch (error) {
+  closeMeetingCreator();
+} catch (error) {
     setFormError(
       error instanceof Error
         ? error.message
@@ -760,20 +772,24 @@ const {
   }
 
   async function recordOutcome(outcome: MeetingOutcome) {
-    if (!currentMeeting) return;
+  if (!currentMeeting) return;
 
-    const completedMeeting = {
-      ...currentMeeting,
-      outcome,
-    };
+  await editMeeting(String(currentMeeting.id), {
+    meeting_date: currentMeeting.date,
+    start_time: `${currentMeeting.time}:00`,
+    duration_minutes: currentMeeting.durationMinutes,
+    title: currentMeeting.title,
+    subtitle: currentMeeting.subtitle,
+    purpose: currentMeeting.purpose,
+    meeting_type: currentMeeting.meetingType,
+    destination: currentMeeting.destination,
+    meeting_category: currentMeeting.category,
+    lifecycle_status: "completed",
+  });
 
-    setCompleted((previous) => [...previous, completedMeeting]);
-
-    await reloadMeetings();
-
-    setIsExpanded(false);
-    setIsChoosingOutcome(false);
-  }
+  setIsExpanded(false);
+  setIsChoosingOutcome(false);
+}
 
   function getStatusDetails(status: MeetingStatus) {
     return (
@@ -1068,13 +1084,8 @@ const labelStyle = {
 
                       {isExpanded && (
                         <ExecutiveBrief
-                          objective={currentMeeting.purpose}
-                          meetingLabel={getMeetingTypeLabel(
-                            currentMeeting.meetingType,
-                          )}
-                          destination={currentMeeting.destination}
-                          action={currentAction}
-                        />
+  brief={executiveBrief}
+/>
                       )}
 
                       <div
@@ -1427,61 +1438,7 @@ const labelStyle = {
               gap: "24px",
             }}
           >
-            <div
-              style={{
-                padding: "30px",
-                border: "1px solid #E9EDF2",
-                borderRadius: "24px",
-                backgroundColor: "#FFFFFF",
-                boxShadow: "0 12px 40px rgba(17, 24, 39, 0.045)",
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#5E6A7D",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.12em",
-                }}
-              >
-                Decision Desk
-              </p>
-
-              <p
-                style={{
-                  margin: "26px 0 0",
-                  fontSize: "17px",
-                  lineHeight: 1.65,
-                  color: "#7B8493",
-                }}
-              >
-                Capture the decisions, questions, and ideas shaping the company.
-              </p>
-
-              <textarea
-                value={thinking}
-                onChange={(event) => setThinking(event.target.value)}
-                placeholder="What needs a decision?"
-                style={{
-                  boxSizing: "border-box",
-                  width: "100%",
-                  minHeight: "180px",
-                  resize: "vertical",
-                  marginTop: "28px",
-                  padding: "18px",
-                  border: "1px solid #EDF0F3",
-                  borderRadius: "18px",
-                  backgroundColor: "#F7F8FA",
-                  color: "#374151",
-                  fontFamily: "inherit",
-                  fontSize: "15px",
-                  lineHeight: 1.5,
-                  outline: "none",
-                }}
-              />
-            </div>
+            <ExecutiveBrief brief={executiveBrief} />
 
             <div
               style={{

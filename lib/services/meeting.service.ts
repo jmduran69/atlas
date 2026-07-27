@@ -9,6 +9,16 @@ type CreateMeetingInput = {
   start_time: string;
 };
 
+type UpdateMeetingInput = {
+  title?: string;
+  subtitle?: string;
+  purpose?: string;
+  objective?: string;
+  meeting_date?: string;
+  start_time?: string;
+  lifecycle_status?: string;
+};
+
 function getOrganizationId() {
   const organizationId = process.env.ATLAS_ORGANIZATION_ID;
 
@@ -50,6 +60,57 @@ export async function createMeeting(meeting: CreateMeetingInput) {
       meeting_date: meeting.meeting_date,
       start_time: meeting.start_time,
     })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+export async function updateMeeting(
+  id: string,
+  meeting: UpdateMeetingInput,
+) {
+  const supabase = createAdminClient();
+
+  const updates: Record<string, string | null> = {};
+
+  if (meeting.title !== undefined) {
+    updates.title = meeting.title;
+  }
+
+  if (meeting.subtitle !== undefined) {
+    updates.subtitle = meeting.subtitle || null;
+  }
+
+  if (meeting.purpose !== undefined) {
+    updates.purpose = meeting.purpose || null;
+  }
+
+  if (meeting.objective !== undefined) {
+    updates.objective = meeting.objective || null;
+  }
+
+  if (meeting.meeting_date !== undefined) {
+    updates.meeting_date = meeting.meeting_date;
+  }
+
+  if (meeting.start_time !== undefined) {
+    updates.start_time = meeting.start_time;
+  }
+
+  if (meeting.lifecycle_status !== undefined) {
+    updates.lifecycle_status = meeting.lifecycle_status;
+  }
+
+  const { data, error } = await supabase
+    .from("meetings")
+    .update(updates)
+    .eq("id", id)
+    .eq("organization_id", getOrganizationId())
     .select()
     .single();
 

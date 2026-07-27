@@ -29,6 +29,16 @@ export type CreateDatabaseMeetingInput = {
   start_time: string;
 };
 
+export type UpdateDatabaseMeetingInput = {
+  title?: string;
+  subtitle?: string;
+  purpose?: string;
+  objective?: string;
+  meeting_date?: string;
+  start_time?: string;
+  lifecycle_status?: string;
+};
+
 async function readErrorMessage(response: Response) {
   try {
     const result = (await response.json()) as {
@@ -59,6 +69,25 @@ export async function saveMeeting(
 ): Promise<DatabaseMeeting> {
   const response = await fetch("/api/meetings", {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(meeting),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  return response.json() as Promise<DatabaseMeeting>;
+}
+
+export async function updateMeeting(
+  id: string,
+  meeting: UpdateDatabaseMeetingInput,
+): Promise<DatabaseMeeting> {
+  const response = await fetch(`/api/meetings/${id}`, {
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
