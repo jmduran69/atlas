@@ -36,6 +36,10 @@ export type UpdateDatabaseMeetingInput = {
   objective?: string;
   meeting_date?: string;
   start_time?: string;
+  duration_minutes?: number | null;
+  meeting_type?: string | null;
+  meeting_category?: string | null;
+  destination?: string | null;
   lifecycle_status?: string;
 };
 
