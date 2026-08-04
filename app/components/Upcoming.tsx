@@ -1,35 +1,67 @@
-import {
-  Meeting,
-  MeetingCategory,
-  MeetingStatus,
-  MeetingType,
-} from "../types";
+"use client";
+
+type MeetingType =
+  | "google-meet"
+  | "zoom"
+  | "teams"
+  | "discord"
+  | "signal"
+  | "whatsapp"
+  | "phone"
+  | "in-person"
+  | "other";
+
+type MeetingStatus = "scheduled" | "in-progress" | "cancelled";
+
+type MeetingCategory =
+  | "internal"
+  | "investor"
+  | "client"
+  | "operations"
+  | "product"
+  | "legal"
+  | "sales"
+  | "hr"
+  | "partnership"
+  | "vendor"
+  | "other";
+
+export type UpcomingMeeting = {
+  id: string | number;
+  date: string;
+  time: string;
+  durationMinutes: number;
+  title: string;
+  subtitle: string;
+  meetingType: MeetingType;
+  category: MeetingCategory;
+  status: MeetingStatus;
+};
 
 type UpcomingProps = {
-  meetings: Meeting[];
+  meetings: UpcomingMeeting[];
   now: Date | null;
   isMounted: boolean;
   onAddMeeting: () => void;
-  onEditMeeting: (meeting: Meeting) => void;
-  onDeleteMeeting: (meeting: Meeting) => void | Promise<void>;
+  onEditMeeting: (meeting: UpcomingMeeting) => void;
+  onDeleteMeeting: (meeting: UpcomingMeeting) => void;
   getMeetingTypeLabel: (type: MeetingType) => string;
   getCategoryLabel: (category: MeetingCategory) => string;
 };
 
-function parseMeetingDate(date: string) {
+function meetingDateOnly(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
 
-function meetingStartDate(meeting: Pick<Meeting, "date" | "time">) {
+function meetingStartDate(meeting: Pick<UpcomingMeeting, "date" | "time">) {
   const [year, month, day] = meeting.date.split("-").map(Number);
   const [hour, minute] = meeting.time.split(":").map(Number);
-
   return new Date(year, month - 1, day, hour, minute, 0, 0);
 }
 
 function meetingEndDate(
-  meeting: Pick<Meeting, "date" | "time" | "durationMinutes">,
+  meeting: Pick<UpcomingMeeting, "date" | "time" | "durationMinutes">,
 ) {
   const end = meetingStartDate(meeting);
   end.setMinutes(end.getMinutes() + meeting.durationMinutes);
@@ -44,51 +76,38 @@ function formatClockTime(date: Date) {
   }).format(date);
 }
 
-function getRelativeDateLabel(date: string, now: Date | null) {
-  if (!now) return "";
+function getRelativeMeetingDate(date: string, currentDate: Date | null) {
+  if (!currentDate) return "Upcoming";
 
-  const meetingDate = parseMeetingDate(date);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const meetingDay = meetingDateOnly(date);
+  const today = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    currentDate.getDate(),
+  );
 
   const differenceInDays = Math.round(
-    (meetingDate.getTime() - today.getTime()) / 86_400_000,
+    (meetingDay.getTime() - today.getTime()) / 86_400_000,
   );
 
   if (differenceInDays === 0) return "Today";
   if (differenceInDays === 1) return "Tomorrow";
-  if (differenceInDays > 1) return `In ${differenceInDays} days`;
 
-  return "Earlier";
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+  }).format(meetingDay);
 }
 
-function getFullDateLabel(date: string) {
+function getFullMeetingDate(date: string) {
   return new Intl.DateTimeFormat("en-GB", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(parseMeetingDate(date));
+  }).format(meetingDateOnly(date));
 }
 
-function getDisplayStatus(
-  meeting: Meeting,
-  now: Date | null,
-  isMounted: boolean,
-): MeetingStatus {
-  if (meeting.status === "cancelled") return "cancelled";
-  if (!isMounted || !now) return meeting.status;
-
-  const meetingHasStarted =
-    meetingStartDate(meeting).getTime() <= now.getTime();
-
-  if (meeting.status === "in-progress" || meetingHasStarted) {
-    return "in-progress";
-  }
-
-  return "scheduled";
-}
-
-function getStatusDetails(status: MeetingStatus) {
+function statusDetails(status: MeetingStatus) {
   switch (status) {
     case "cancelled":
       return {
@@ -97,7 +116,6 @@ function getStatusDetails(status: MeetingStatus) {
         backgroundColor: "#FDECEC",
         color: "#C53030",
       };
-
     case "in-progress":
       return {
         label: "In Progress",
@@ -105,7 +123,6 @@ function getStatusDetails(status: MeetingStatus) {
         backgroundColor: "#FFF4D6",
         color: "#A66B00",
       };
-
     default:
       return {
         label: "Scheduled",
@@ -126,6 +143,8 @@ export default function Upcoming({
   getMeetingTypeLabel,
   getCategoryLabel,
 }: UpcomingProps) {
+  const nowTime = now?.getTime() ?? 0;
+
   return (
     <section style={cardStyle}>
       <div style={headerStyle}>
@@ -133,54 +152,47 @@ export default function Upcoming({
         <span style={countStyle}>{meetings.length}</span>
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        {meetings.length > 0 ? (
-          meetings.map((meeting, index) => {
-            const displayStatus = getDisplayStatus(
-              meeting,
-              now,
-              isMounted,
-            );
-
-            const statusDetails = getStatusDetails(displayStatus);
+      {meetings.length > 0 ? (
+        <div style={{ marginTop: "18px" }}>
+          {meetings.map((meeting, index) => {
+            const meetingHasStarted =
+              isMounted && meetingStartDate(meeting).getTime() <= nowTime;
+            const displayStatus: MeetingStatus =
+              meeting.status === "cancelled"
+                ? "cancelled"
+                : meeting.status === "in-progress" || meetingHasStarted
+                  ? "in-progress"
+                  : "scheduled";
+            const status = statusDetails(displayStatus);
 
             return (
               <article
                 key={meeting.id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "145px 1fr auto",
-                  gap: 22,
+                  gridTemplateColumns: "150px minmax(0, 1fr) auto",
+                  gap: "22px",
                   alignItems: "center",
-                  padding: "22px 0",
-                  borderTop:
-                    index === 0 ? "none" : "1px solid #EDF0F3",
+                  padding: "24px 0",
+                  borderTop: index === 0 ? "none" : "1px solid #EEF1F4",
                 }}
               >
                 <div>
                   <p style={relativeDateStyle}>
-                    {getRelativeDateLabel(meeting.date, now)}
+                    {getRelativeMeetingDate(meeting.date, now)}
                   </p>
-
                   <p style={fullDateStyle}>
-                    {getFullDateLabel(meeting.date)}
+                    {getFullMeetingDate(meeting.date)}
                   </p>
-
                   <p style={timeStyle}>
-                    {meeting.time}–
-                    {formatClockTime(meetingEndDate(meeting))}
+                    {meeting.time}–{formatClockTime(meetingEndDate(meeting))}
                   </p>
-
-                  <p style={durationStyle}>
-                    {meeting.durationMinutes} min
-                  </p>
+                  <p style={durationStyle}>{meeting.durationMinutes} min</p>
                 </div>
 
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <p style={titleStyle}>{meeting.title}</p>
-
                   <p style={subtitleStyle}>{meeting.subtitle}</p>
-
                   <p style={metaStyle}>
                     {getMeetingTypeLabel(meeting.meetingType)} ·{" "}
                     {getCategoryLabel(meeting.category)}
@@ -190,35 +202,25 @@ export default function Upcoming({
                 <div style={{ textAlign: "right" }}>
                   <span
                     style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 7,
-                      minHeight: 32,
-                      padding: "0 13px",
-                      borderRadius: 999,
-                      backgroundColor:
-                        statusDetails.backgroundColor,
-                      color: statusDetails.color,
-                      fontSize: 12,
-                      fontWeight: 700,
+                      ...statusStyle,
+                      backgroundColor: status.backgroundColor,
+                      color: status.color,
                     }}
                   >
-                    {statusDetails.symbol} {statusDetails.label}
+                    {status.symbol} {status.label}
                   </span>
-
                   <div style={actionsStyle}>
                     <button
                       type="button"
                       onClick={() => onEditMeeting(meeting)}
-                      style={editButtonStyle}
+                      style={rowActionStyle}
                     >
                       Edit
                     </button>
-
                     <button
                       type="button"
                       onClick={() => onDeleteMeeting(meeting)}
-                      style={deleteButtonStyle}
+                      style={{ ...rowActionStyle, color: "#985C5C" }}
                     >
                       Delete
                     </button>
@@ -226,29 +228,25 @@ export default function Upcoming({
                 </div>
               </article>
             );
-          })
-        ) : (
-          <p style={emptyTextStyle}>Nothing else is waiting.</p>
-        )}
-      </div>
+          })}
+        </div>
+      ) : (
+        <p style={emptyTextStyle}>Nothing else is waiting.</p>
+      )}
 
-      <button
-        type="button"
-        onClick={onAddMeeting}
-        style={addButtonStyle}
-      >
-        + Add to today
+      <button type="button" onClick={onAddMeeting} style={addButtonStyle}>
+        + Add to today…
       </button>
     </section>
   );
 }
 
 const cardStyle = {
-  padding: 26,
-  border: "1px solid #E3E7EC",
-  borderRadius: 24,
+  padding: "30px",
+  border: "1px solid #E9EDF2",
+  borderRadius: "24px",
   backgroundColor: "#FFFFFF",
-  boxShadow: "0 12px 38px rgba(30, 58, 95, 0.055)",
+  boxShadow: "0 12px 40px rgba(17, 24, 39, 0.045)",
 };
 
 const headerStyle = {
@@ -259,114 +257,123 @@ const headerStyle = {
 
 const labelStyle = {
   margin: 0,
-  fontSize: 12,
-  fontWeight: 800,
-  color: "#59667A",
+  fontSize: "13px",
+  fontWeight: 700,
+  color: "#5E6A7D",
   textTransform: "uppercase" as const,
-  letterSpacing: "0.15em",
+  letterSpacing: "0.12em",
 };
 
 const countStyle = {
   display: "grid",
   placeItems: "center",
-  minWidth: 28,
-  height: 28,
-  borderRadius: 999,
+  minWidth: "28px",
+  height: "28px",
+  padding: "0 7px",
+  borderRadius: "999px",
   backgroundColor: "#EFF4F9",
   color: "#31577D",
-  fontSize: 12,
+  fontSize: "12px",
   fontWeight: 800,
 };
 
 const relativeDateStyle = {
   margin: 0,
-  fontSize: 13,
+  fontSize: "14px",
   fontWeight: 800,
   color: "#31577D",
 };
 
 const fullDateStyle = {
-  margin: "3px 0 0",
-  fontSize: 12,
+  margin: "4px 0 0",
+  fontSize: "12px",
   lineHeight: 1.4,
-  color: "#7B8794",
+  color: "#8792A3",
 };
 
 const timeStyle = {
   margin: "12px 0 0",
-  fontSize: 16,
-  fontWeight: 800,
+  fontSize: "17px",
+  fontWeight: 700,
   color: "#1E3A5F",
 };
 
 const durationStyle = {
   margin: "4px 0 0",
-  color: "#9AA3B0",
-  fontSize: 11,
+  color: "#A0A8B4",
+  fontSize: "11px",
   fontWeight: 800,
 };
 
 const titleStyle = {
   margin: 0,
-  fontSize: 17,
-  fontWeight: 720,
-  color: "#253044",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  fontSize: "18px",
+  fontWeight: 700,
+  color: "#1F2937",
 };
 
 const subtitleStyle = {
-  margin: "5px 0 0",
-  fontSize: 13,
+  margin: "6px 0 0",
+  fontSize: "15px",
   lineHeight: 1.45,
-  color: "#8993A2",
+  color: "#8A93A3",
 };
 
 const metaStyle = {
   margin: "10px 0 0",
-  fontSize: 11,
-  fontWeight: 800,
+  fontSize: "12px",
+  fontWeight: 700,
   color: "#60738A",
+};
+
+const statusStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "7px",
+  minHeight: "32px",
+  padding: "0 13px",
+  borderRadius: "999px",
+  whiteSpace: "nowrap" as const,
+  fontSize: "12px",
+  fontWeight: 700,
 };
 
 const actionsStyle = {
   display: "flex",
   justifyContent: "flex-end",
-  gap: 10,
-  marginTop: 9,
+  gap: "10px",
+  marginTop: "10px",
 };
 
-const editButtonStyle = {
+const rowActionStyle = {
   padding: 0,
   border: 0,
   backgroundColor: "transparent",
   color: "#60738A",
   fontFamily: "inherit",
-  fontSize: 11,
+  fontSize: "11px",
   fontWeight: 700,
   cursor: "pointer",
 };
 
-const deleteButtonStyle = {
-  ...editButtonStyle,
-  color: "#985C5C",
-};
-
 const emptyTextStyle = {
-  margin: "20px 0",
-  color: "#A0A7B2",
-  fontSize: 14,
+  margin: "22px 0 0",
+  color: "#9CA3AF",
 };
 
 const addButtonStyle = {
   width: "100%",
-  marginTop: 8,
-  padding: "16px 0 0",
+  marginTop: "18px",
+  padding: "18px 0 4px",
   border: 0,
-  borderTop: "1px solid #EDF0F3",
+  borderTop: "1px solid #EEF1F4",
   backgroundColor: "transparent",
   color: "#31577D",
   fontFamily: "inherit",
-  fontSize: 14,
-  fontWeight: 800,
+  fontSize: "15px",
+  fontWeight: 700,
   textAlign: "left" as const,
   cursor: "pointer",
 };

@@ -7,6 +7,11 @@ type CreateMeetingInput = {
   objective?: string;
   meeting_date: string;
   start_time: string;
+  duration_minutes?: number | null;
+  meeting_type?: string | null;
+  meeting_category?: string | null;
+  destination?: string | null;
+  lifecycle_status?: string;
 };
 
 type UpdateMeetingInput = {
@@ -16,6 +21,10 @@ type UpdateMeetingInput = {
   objective?: string;
   meeting_date?: string;
   start_time?: string;
+  duration_minutes?: number | null;
+  meeting_type?: string | null;
+  meeting_category?: string | null;
+  destination?: string | null;
   lifecycle_status?: string;
 };
 
@@ -59,6 +68,11 @@ export async function createMeeting(meeting: CreateMeetingInput) {
       objective: meeting.objective ?? null,
       meeting_date: meeting.meeting_date,
       start_time: meeting.start_time,
+      duration_minutes: meeting.duration_minutes ?? 60,
+      meeting_type: meeting.meeting_type ?? null,
+      meeting_category: meeting.meeting_category ?? null,
+      destination: meeting.destination ?? null,
+      lifecycle_status: meeting.lifecycle_status ?? "scheduled",
     })
     .select()
     .single();
@@ -76,7 +90,7 @@ export async function updateMeeting(
 ) {
   const supabase = createAdminClient();
 
-  const updates: Record<string, string | null> = {};
+  const updates: Record<string, string | number | null> = {};
 
   if (meeting.title !== undefined) {
     updates.title = meeting.title;
@@ -100,6 +114,23 @@ export async function updateMeeting(
 
   if (meeting.start_time !== undefined) {
     updates.start_time = meeting.start_time;
+  }
+
+  if (meeting.duration_minutes !== undefined) {
+    updates.duration_minutes = meeting.duration_minutes;
+  }
+
+  if (meeting.meeting_type !== undefined) {
+    updates.meeting_type = meeting.meeting_type || null;
+  }
+
+  if (meeting.meeting_category !== undefined) {
+    updates.meeting_category =
+      meeting.meeting_category || null;
+  }
+
+  if (meeting.destination !== undefined) {
+    updates.destination = meeting.destination || null;
   }
 
   if (meeting.lifecycle_status !== undefined) {

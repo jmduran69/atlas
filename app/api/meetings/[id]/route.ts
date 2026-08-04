@@ -18,6 +18,10 @@ type UpdateMeetingRequest = {
   objective?: string;
   meeting_date?: string;
   start_time?: string;
+  duration_minutes?: number | null;
+  meeting_type?: string | null;
+  meeting_category?: string | null;
+  destination?: string | null;
   lifecycle_status?: string;
 };
 
@@ -31,7 +35,19 @@ export async function PUT(
     const body =
       (await request.json()) as UpdateMeetingRequest;
 
-    const meeting = await updateMeeting(id, body);
+    const meeting = await updateMeeting(id, {
+      title: body.title,
+      subtitle: body.subtitle,
+      purpose: body.purpose,
+      objective: body.objective,
+      meeting_date: body.meeting_date,
+      start_time: body.start_time,
+      duration_minutes: body.duration_minutes,
+      meeting_type: body.meeting_type,
+      meeting_category: body.meeting_category,
+      destination: body.destination,
+      lifecycle_status: body.lifecycle_status,
+    });
 
     return NextResponse.json(meeting);
   } catch (error) {

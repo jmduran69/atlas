@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import {
   createMeeting,
   getMeetings,
@@ -11,6 +12,11 @@ type CreateMeetingRequest = {
   objective?: string;
   meeting_date?: string;
   start_time?: string;
+  duration_minutes?: number | null;
+  meeting_type?: string | null;
+  meeting_category?: string | null;
+  destination?: string | null;
+  lifecycle_status?: string;
 };
 
 export async function GET() {
@@ -58,12 +64,19 @@ export async function POST(request: Request) {
       objective: body.objective?.trim() || undefined,
       meeting_date: meetingDate,
       start_time: startTime,
+      duration_minutes: body.duration_minutes,
+      meeting_type: body.meeting_type?.trim() || undefined,
+      meeting_category:
+        body.meeting_category?.trim() || undefined,
+      destination: body.destination?.trim() || undefined,
+      lifecycle_status:
+        body.lifecycle_status?.trim() || undefined,
     });
 
     return NextResponse.json(meeting, { status: 201 });
   } catch (error) {
     console.error("POST /api/meetings failed:", error);
-    
+
     return NextResponse.json(
       {
         status: "error",

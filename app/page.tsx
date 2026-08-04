@@ -3,11 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import { useMeetings } from "@/lib/hooks/useMeetings";
-import { buildExecutiveBrief } from "@/lib/intelligence/executiveBrief";
 import { deleteMeeting as deleteMeetingApi } from "@/lib/api/meetings";
 
 import ExecutiveBrief from "./components/ExecutiveBrief";
-import Upcoming from "./components/Upcoming";
 
 type MeetingType =
   | "google-meet"
@@ -385,30 +383,41 @@ function destinationPlaceholder(type: MeetingType) {
   }
 }
 
+function normalizeWebDestination(destination: string) {
+  const trimmed = destination.trim();
+
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  return `https://${trimmed}`;
+}
+
 function getActionDetails(meeting: Meeting) {
   const destination = meeting.destination.trim();
 
   if (!destination) return null;
 
+  const webDestination = normalizeWebDestination(destination);
+
   switch (meeting.meetingType) {
     case "google-meet":
       return {
         label: "Join Google Meet",
-        href: destination,
+        href: webDestination,
         symbol: "●",
       };
 
     case "zoom":
       return {
         label: "Join Zoom",
-        href: destination,
+        href: webDestination,
         symbol: "◉",
       };
 
     case "teams":
       return {
         label: "Join Teams",
-        href: destination,
+        href: webDestination,
         symbol: "◆",
       };
 
@@ -460,13 +469,11 @@ function getActionDetails(meeting: Meeting) {
     }
 
     case "other":
-      return destination.startsWith("http")
-        ? {
-            label: "Open Meeting Link",
-            href: destination,
-            symbol: "↗",
-          }
-        : null;
+      return {
+        label: "Open Meeting Link",
+        href: webDestination,
+        symbol: "↗",
+      };
   }
 }
 
@@ -520,11 +527,6 @@ const {
 
   const nowTime = now?.getTime() ?? 0;
 
-  const executiveBrief = buildExecutiveBrief(
-  meetings,
-  now ?? new Date(),
-);
-
   const sortedMeetings = [...meetings].sort(
     (first, second) =>
       meetingStartDate(first).getTime() - meetingStartDate(second).getTime(),
@@ -546,8 +548,8 @@ const {
   );
 
   const currentMeeting = !isMounted
-  ? null
-  : activeMeeting ?? nextMeeting;
+    ? nonCancelledMeetings[0]
+    : activeMeeting ?? nextMeeting ?? nonCancelledMeetings.at(-1);
 
   const upcomingMeetings = currentMeeting
     ? sortedMeetings.filter(
@@ -711,47 +713,52 @@ const {
 }
 
   async function createMeeting(event: FormEvent<HTMLFormElement>) {
-  event.preventDefault();
+    event.preventDefault();
 
-  if (!newMeeting.title.trim()) {
-    setFormError("Please give the meeting a title.");
-    return;
+    if (!newMeeting.title.trim()) {
+      setFormError("Please give the meeting a title.");
+      return;
+    }
+
+    if (!newMeeting.time) {
+      setFormError("Please select a meeting time.");
+      return;
+    }
+
+    setFormError("");
+
+    try {
+      const meetingInput = {
+        title: newMeeting.title.trim(),
+        subtitle: newMeeting.purpose.trim() || "New meeting",
+        purpose:
+          newMeeting.purpose.trim() ||
+          "Clarify what success should look like before the meeting begins.",
+        objective: newMeeting.purpose.trim() || undefined,
+        meeting_date: newMeeting.date,
+        start_time: newMeeting.time,
+        duration_minutes: newMeeting.durationMinutes,
+        meeting_type: newMeeting.meetingType,
+        destination: newMeeting.destination.trim() || null,
+        meeting_category: newMeeting.category,
+        lifecycle_status: newMeeting.status,
+      };
+
+      if (editingMeetingId !== null) {
+        await editMeeting(String(editingMeetingId), meetingInput);
+      } else {
+        await addMeeting(meetingInput);
+      }
+
+      closeMeetingCreator();
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Atlas could not save this meeting.",
+      );
+    }
   }
-
-  if (!newMeeting.time) {
-    setFormError("Please select a meeting time.");
-    return;
-  }
-
-  setFormError("");
-
-  try {
-  const meetingInput = {
-    title: newMeeting.title.trim(),
-    subtitle: newMeeting.purpose.trim() || "New meeting",
-    purpose:
-      newMeeting.purpose.trim() ||
-      "Clarify what success should look like before the meeting begins.",
-    objective: newMeeting.purpose.trim() || undefined,
-    meeting_date: newMeeting.date,
-    start_time: newMeeting.time,
-  };
-
-  if (editingMeetingId !== null) {
-    await editMeeting(String(editingMeetingId), meetingInput);
-  } else {
-    await addMeeting(meetingInput);
-  }
-
-  closeMeetingCreator();
-} catch (error) {
-    setFormError(
-      error instanceof Error
-        ? error.message
-        : "Atlas could not save this meeting.",
-    );
-  }
-}
   function toggleFounder(founder: FounderName) {  
     setNewMeeting((previous) => ({
       ...previous,
@@ -772,24 +779,32 @@ const {
   }
 
   async function recordOutcome(outcome: MeetingOutcome) {
-  if (!currentMeeting) return;
+    if (!currentMeeting) return;
 
-  await editMeeting(String(currentMeeting.id), {
-    meeting_date: currentMeeting.date,
-    start_time: `${currentMeeting.time}:00`,
-    duration_minutes: currentMeeting.durationMinutes,
-    title: currentMeeting.title,
-    subtitle: currentMeeting.subtitle,
-    purpose: currentMeeting.purpose,
-    meeting_type: currentMeeting.meetingType,
-    destination: currentMeeting.destination,
-    meeting_category: currentMeeting.category,
-    lifecycle_status: "completed",
-  });
+    await editMeeting(String(currentMeeting.id), {
+      meeting_date: currentMeeting.date,
+      start_time: `${currentMeeting.time}:00`,
+      duration_minutes: currentMeeting.durationMinutes,
+      title: currentMeeting.title,
+      subtitle: currentMeeting.subtitle,
+      purpose: currentMeeting.purpose,
+      meeting_type: currentMeeting.meetingType,
+      destination: currentMeeting.destination || null,
+      meeting_category: currentMeeting.category,
+      lifecycle_status: "completed",
+    });
 
-  setIsExpanded(false);
-  setIsChoosingOutcome(false);
-}
+    setCompleted((previous) => [
+      ...previous,
+      {
+        ...currentMeeting,
+        outcome,
+      },
+    ]);
+
+    setIsExpanded(false);
+    setIsChoosingOutcome(false);
+  }
 
   function getStatusDetails(status: MeetingStatus) {
     return (
@@ -1084,8 +1099,13 @@ const labelStyle = {
 
                       {isExpanded && (
                         <ExecutiveBrief
-  brief={executiveBrief}
-/>
+                          objective={currentMeeting.purpose}
+                          meetingLabel={getMeetingTypeLabel(
+                            currentMeeting.meetingType,
+                          )}
+                          destination={currentMeeting.destination}
+                          action={currentAction}
+                        />
                       )}
 
                       <div
@@ -1420,16 +1440,231 @@ const labelStyle = {
               </div>
             )}
 
-            <Upcoming
-              meetings={upcomingMeetings}
-              now={now}
-              isMounted={isMounted}
-              onAddMeeting={openMeetingCreator}
-              onEditMeeting={(meeting) => openMeetingEditor(meeting as Meeting)}
-              onDeleteMeeting={(meeting) => deleteMeeting(meeting as Meeting)}
-              getMeetingTypeLabel={getMeetingTypeLabel}
-              getCategoryLabel={getCategoryLabel}
-            />
+            <div
+              style={{
+                padding: "30px",
+                border: "1px solid #E9EDF2",
+                borderRadius: "24px",
+                backgroundColor: "#FFFFFF",
+                boxShadow: "0 12px 40px rgba(17, 24, 39, 0.045)",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#5E6A7D",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                }}
+              >
+                Upcoming
+              </p>
+
+              {upcomingMeetings.length > 0 ? (
+                <div style={{ marginTop: "18px" }}>
+                  {upcomingMeetings.map((meeting, index) => {
+                    const meetingHasStarted =
+                      isMounted &&
+                      meetingStartDate(meeting).getTime() <= nowTime;
+                    const displayStatus: MeetingStatus =
+                      meeting.status === "cancelled"
+                        ? "cancelled"
+                        : meeting.status === "in-progress" || meetingHasStarted
+                          ? "in-progress"
+                          : "scheduled";
+
+                    const relativeDate = getRelativeMeetingDate(
+                      meeting.date,
+                      now,
+                    );
+                    const fullDate = getFullMeetingDate(meeting.date);
+
+                    return (
+                      <div
+                        key={meeting.id}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "150px 1fr auto",
+                          gap: "22px",
+                          alignItems: "center",
+                          padding: "24px 0",
+                          borderTop:
+                            index === 0 ? "none" : "1px solid #EEF1F4",
+                        }}
+                      >
+                        <div>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "14px",
+                              fontWeight: 800,
+                              color: "#31577D",
+                            }}
+                          >
+                            {relativeDate}
+                          </p>
+
+                          <p
+                            style={{
+                              margin: "4px 0 0",
+                              fontSize: "12px",
+                              lineHeight: 1.4,
+                              color: "#8792A3",
+                            }}
+                          >
+                            {fullDate}
+                          </p>
+
+                          <p
+                            style={{
+                              margin: "12px 0 0",
+                              fontSize: "17px",
+                              fontWeight: 700,
+                              color: "#1E3A5F",
+                            }}
+                          >
+                            {meeting.time}–{formatClockTime(
+                              meetingEndDate(meeting),
+                            )}
+                          </p>
+
+                          <p
+                            style={{
+                              margin: "4px 0 0",
+                              color: "#A0A8B4",
+                              fontSize: "11px",
+                              fontWeight: 800,
+                            }}
+                          >
+                            {meeting.durationMinutes} min
+                          </p>
+                        </div>
+
+                        <div>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "18px",
+                              fontWeight: 700,
+                              color: "#1F2937",
+                            }}
+                          >
+                            {meeting.title}
+                          </p>
+
+                          <p
+                            style={{
+                              margin: "6px 0 0",
+                              fontSize: "15px",
+                              lineHeight: 1.45,
+                              color: "#8A93A3",
+                            }}
+                          >
+                            {meeting.subtitle}
+                          </p>
+
+                          <p
+                            style={{
+                              margin: "10px 0 0",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#60738A",
+                            }}
+                          >
+                            {getMeetingTypeLabel(meeting.meetingType)} ·{" "}
+                            {getCategoryLabel(meeting.category)}
+                          </p>
+                        </div>
+
+                        <div style={{ textAlign: "right" }}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "7px",
+                              minHeight: "32px",
+                              padding: "0 13px",
+                              borderRadius: "999px",
+                              backgroundColor:
+                                displayStatus === "cancelled"
+                                  ? "#FDECEC"
+                                  : displayStatus === "in-progress"
+                                    ? "#FFF4D6"
+                                    : "#EAF8EE",
+                              color:
+                                displayStatus === "cancelled"
+                                  ? "#C53030"
+                                  : displayStatus === "in-progress"
+                                    ? "#A66B00"
+                                    : "#2E7D32",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {getStatusDetails(displayStatus).symbol}{" "}
+                            {getStatusDetails(displayStatus).label}
+                          </span>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "flex-end",
+                              gap: "10px",
+                              marginTop: "10px",
+                            }}
+                          >
+                            <button
+                              onClick={() => openMeetingEditor(meeting)}
+                              style={rowActionStyle}
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              onClick={() => deleteMeeting(meeting)}
+                              style={{ ...rowActionStyle, color: "#985C5C" }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p
+                  style={{
+                    margin: "22px 0 0",
+                    color: "#9CA3AF",
+                  }}
+                >
+                  Nothing else is waiting.
+                </p>
+              )}
+
+              <button
+                onClick={openMeetingCreator}
+                style={{
+                  width: "100%",
+                  marginTop: "18px",
+                  padding: "18px 0 4px",
+                  border: 0,
+                  borderTop: "1px solid #EEF1F4",
+                  backgroundColor: "transparent",
+                  color: "#31577D",
+                  fontFamily: "inherit",
+                  fontSize: "15px",
+                  fontWeight: 700,
+                  textAlign: "left",
+                  cursor: "pointer",
+                }}
+              >
+                + Add to today…
+              </button>
+            </div>
           </div>
 
           <aside
@@ -1438,7 +1673,61 @@ const labelStyle = {
               gap: "24px",
             }}
           >
-            <ExecutiveBrief brief={executiveBrief} />
+            <div
+              style={{
+                padding: "30px",
+                border: "1px solid #E9EDF2",
+                borderRadius: "24px",
+                backgroundColor: "#FFFFFF",
+                boxShadow: "0 12px 40px rgba(17, 24, 39, 0.045)",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#5E6A7D",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                }}
+              >
+                Decision Desk
+              </p>
+
+              <p
+                style={{
+                  margin: "26px 0 0",
+                  fontSize: "17px",
+                  lineHeight: 1.65,
+                  color: "#7B8493",
+                }}
+              >
+                Capture the decisions, questions, and ideas shaping the company.
+              </p>
+
+              <textarea
+                value={thinking}
+                onChange={(event) => setThinking(event.target.value)}
+                placeholder="What needs a decision?"
+                style={{
+                  boxSizing: "border-box",
+                  width: "100%",
+                  minHeight: "180px",
+                  resize: "vertical",
+                  marginTop: "28px",
+                  padding: "18px",
+                  border: "1px solid #EDF0F3",
+                  borderRadius: "18px",
+                  backgroundColor: "#F7F8FA",
+                  color: "#374151",
+                  fontFamily: "inherit",
+                  fontSize: "15px",
+                  lineHeight: 1.5,
+                  outline: "none",
+                }}
+              />
+            </div>
 
             <div
               style={{
