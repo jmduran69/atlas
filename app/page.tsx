@@ -536,20 +536,40 @@ const {
     (meeting) => meeting.status !== "cancelled",
   );
 
-  const activeMeeting = nonCancelledMeetings.find((meeting) => {
+  const todayStart = now
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    : null;
+
+  const tomorrowStart = todayStart
+    ? new Date(
+        todayStart.getFullYear(),
+        todayStart.getMonth(),
+        todayStart.getDate() + 1,
+      )
+    : null;
+
+  const todayMeetings =
+    todayStart && tomorrowStart
+      ? nonCancelledMeetings.filter((meeting) => {
+          const startTime = meetingStartDate(meeting);
+          return startTime >= todayStart && startTime < tomorrowStart;
+        })
+      : [];
+
+  const activeMeeting = todayMeetings.find((meeting) => {
     const startTime = meetingStartDate(meeting).getTime();
     const endTime = meetingEndDate(meeting).getTime();
 
     return nowTime >= startTime && nowTime < endTime;
   });
 
-  const nextMeeting = nonCancelledMeetings.find(
+  const nextMeetingToday = todayMeetings.find(
     (meeting) => meetingStartDate(meeting).getTime() > nowTime,
   );
 
   const currentMeeting = !isMounted
-    ? nonCancelledMeetings[0]
-    : activeMeeting ?? nextMeeting ?? nonCancelledMeetings.at(-1);
+    ? null
+    : activeMeeting ?? nextMeetingToday ?? null;
 
   const upcomingMeetings = currentMeeting
     ? sortedMeetings.filter(
