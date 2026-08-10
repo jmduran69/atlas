@@ -882,7 +882,7 @@ const labelStyle = {
         backgroundColor: "#F7F8FA",
         color: "#111827",
         fontFamily: "Inter, Arial, sans-serif",
-        padding: "64px 28px 80px",
+        padding: "32px 28px 80px",
       }}
     >
       <div
@@ -893,11 +893,12 @@ const labelStyle = {
         }}
       >
         <header
-          style={{
-            textAlign: "center",
-            marginBottom: "64px",
-          }}
-        >
+  className="atlas-header"
+  style={{
+    textAlign: "center",
+    marginBottom: "32px",
+  }}
+>
           <h1
             style={{
               margin: 0,
