@@ -53,19 +53,7 @@ export default function ExecutiveBrief({
       >
         <p style={labelStyle}>Executive Brief</p>
 
-        <p style={labelStyle}>Today&apos;s Objective</p>
-
-        <p
-          style={{
-            margin: "8px 0 22px",
-            fontSize: "16px",
-            lineHeight: 1.6,
-            color: "#374151",
-          }}
-        >
-          {objective}
-        </p>
-
+        
         <p
           style={{
             ...labelStyle,
