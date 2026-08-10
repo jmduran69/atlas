@@ -1692,7 +1692,7 @@ const labelStyle = {
                   cursor: "pointer",
                 }}
               >
-                + Add to today…
+                + Add New Meeting
               </button>
             </div>
           </div>
