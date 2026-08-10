@@ -26,7 +26,11 @@ type MeetingOutcome =
 
 type FounderName = "Raj" | "Yola" | "Carl" | "Juan";
 
-type MeetingStatus = "scheduled" | "in-progress" | "cancelled";
+type MeetingStatus =
+  | "scheduled"
+  | "in-progress"
+  | "completed"
+  | "cancelled";
 
 type MeetingCategory =
   | "internal"
@@ -571,14 +575,12 @@ const {
     ? null
     : activeMeeting ?? nextMeetingToday ?? null;
 
-  const upcomingMeetings = currentMeeting
-    ? sortedMeetings.filter(
-        (meeting) =>
-          meeting.id !== currentMeeting.id &&
-          meetingStartDate(meeting).getTime() >
-            meetingStartDate(currentMeeting).getTime(),
-      )
-    : sortedMeetings;
+  const upcomingMeetings = sortedMeetings.filter(
+  (meeting) =>
+    meeting.status !== "cancelled" &&
+    meetingEndDate(meeting).getTime() > nowTime &&
+    meeting.id !== currentMeeting?.id,
+);
 
   const currentMeetingStart = currentMeeting
     ? meetingStartDate(currentMeeting)
@@ -1489,12 +1491,19 @@ const labelStyle = {
                     const meetingHasStarted =
                       isMounted &&
                       meetingStartDate(meeting).getTime() <= nowTime;
+
+                      const meetingHasEnded =
+  isMounted &&
+  meetingEndDate(meeting).getTime() <= nowTime;
+                      
                     const displayStatus: MeetingStatus =
-                      meeting.status === "cancelled"
-                        ? "cancelled"
-                        : meeting.status === "in-progress" || meetingHasStarted
-                          ? "in-progress"
-                          : "scheduled";
+  meeting.status === "cancelled"
+    ? "cancelled"
+    : meetingHasEnded
+      ? "completed"
+      : meetingHasStarted
+        ? "in-progress"
+        : "scheduled";
 
                     const relativeDate = getRelativeMeetingDate(
                       meeting.date,
