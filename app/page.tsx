@@ -888,7 +888,7 @@ const labelStyle = {
       <div
         style={{
           width: "100%",
-          maxWidth: "1080px",
+          maxWidth: "1480px",
           margin: "0 auto",
         }}
       >
