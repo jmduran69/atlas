@@ -1,3 +1,12 @@
+"use client";
+import { useEffect, useState } from "react";
+
+type AtlasIntelligenceResponse = {
+  status: string;
+  meetingCount?: number;
+  intelligence?: string;
+  message?: string;
+};
 type ExecutiveBriefData = {
   greeting: string;
   totalMeetingsToday: number;
@@ -40,6 +49,26 @@ export default function ExecutiveBrief({
   destination,
   action,
 }: ExecutiveBriefProps) {
+  const [intelligence, setIntelligence] = useState<string | null>(null);
+  useEffect(() => {
+  async function loadIntelligence() {
+    try {
+      const response = await fetch("/api/intelligence/brief");
+      const data = (await response.json()) as AtlasIntelligenceResponse;
+
+      if (response.ok && data.intelligence) {
+        setIntelligence(data.intelligence);
+      }
+    } catch (error) {
+      console.error("Unable to load Atlas Intelligence:", error);
+    }
+  }
+
+  void loadIntelligence();
+}, []);
+if (intelligence) {
+  console.log("Atlas Intelligence loaded:", intelligence);
+}
   if (!brief) {
     return (
       <div
@@ -52,7 +81,38 @@ export default function ExecutiveBrief({
         }}
       >
         <p style={labelStyle}>Executive Brief</p>
+{intelligence && (
+  <div
+    style={{
+      marginTop: "18px",
+      padding: "18px",
+      borderRadius: "14px",
+      backgroundColor: "#FFFFFF",
+      border: "1px solid #E9EDF2",
+    }}
+  >
+    <p
+      style={{
+        ...labelStyle,
+        marginBottom: "10px",
+      }}
+    >
+      Atlas Intelligence
+    </p>
 
+    <p
+      style={{
+        margin: 0,
+        fontSize: "15px",
+        lineHeight: 1.65,
+        color: "#4B5563",
+        whiteSpace: "pre-wrap",
+      }}
+    >
+      {intelligence}
+    </p>
+  </div>
+)}
         
         <p
           style={{
