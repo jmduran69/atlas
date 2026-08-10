@@ -11,7 +11,11 @@ type MeetingType =
   | "in-person"
   | "other";
 
-type MeetingStatus = "scheduled" | "in-progress" | "cancelled";
+type MeetingStatus =
+  | "scheduled"
+  | "in-progress"
+  | "completed"
+  | "cancelled";
 
 type MeetingCategory =
   | "internal"
@@ -116,6 +120,13 @@ function statusDetails(status: MeetingStatus) {
         backgroundColor: "#FDECEC",
         color: "#C53030",
       };
+      case "completed":
+  return {
+    label: "Completed",
+    symbol: "✓",
+    backgroundColor: "#EAF8EE",
+    color: "#2E7D32",
+  };
     case "in-progress":
       return {
         label: "In Progress",
@@ -155,14 +166,23 @@ export default function Upcoming({
       {meetings.length > 0 ? (
         <div style={{ marginTop: "18px" }}>
           {meetings.map((meeting, index) => {
-            const meetingHasStarted =
-              isMounted && meetingStartDate(meeting).getTime() <= nowTime;
-            const displayStatus: MeetingStatus =
-              meeting.status === "cancelled"
-                ? "cancelled"
-                : meeting.status === "in-progress" || meetingHasStarted
-                  ? "in-progress"
-                  : "scheduled";
+            const meetingStart = meetingStartDate(meeting);
+const meetingEnd = meetingEndDate(meeting);
+
+const meetingHasStarted =
+  isMounted && meetingStart.getTime() <= nowTime;
+
+const meetingHasEnded =
+  isMounted && meetingEnd.getTime() <= nowTime;
+
+const displayStatus: MeetingStatus =
+  meeting.status === "cancelled"
+    ? "cancelled"
+    : meetingHasEnded
+      ? "completed"
+      : meetingHasStarted
+        ? "in-progress"
+        : "scheduled";
             const status = statusDetails(displayStatus);
 
             return (
