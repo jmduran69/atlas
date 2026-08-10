@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 type AtlasIntelligenceResponse = {
   status: string;
@@ -66,9 +67,7 @@ export default function ExecutiveBrief({
 
   void loadIntelligence();
 }, []);
-if (intelligence) {
-  console.log("Atlas Intelligence loaded:", intelligence);
-}
+
   if (!brief) {
     return (
       <div
@@ -100,17 +99,44 @@ if (intelligence) {
       Atlas Intelligence
     </p>
 
-    <p
-      style={{
-        margin: 0,
-        fontSize: "15px",
-        lineHeight: 1.65,
-        color: "#4B5563",
-        whiteSpace: "pre-wrap",
-      }}
-    >
-      {intelligence}
-    </p>
+    <div
+  style={{
+    fontSize: "15px",
+    lineHeight: 1.65,
+    color: "#4B5563",
+  }}
+>
+  <ReactMarkdown
+  components={{
+    p: ({ children }) => (
+  <p
+    style={{
+      margin: "0 0 12px",
+      lineHeight: 1.65,
+    }}
+  >
+    {children}
+  </p>
+),
+    h3: ({ children }) => (
+      <h3
+        style={{
+          margin: "20px 0 8px",
+          fontSize: "13px",
+          fontWeight: 800,
+          color: "#244B73",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}
+      >
+        {children}
+      </h3>
+    ),
+  }}
+>
+  {intelligence}
+</ReactMarkdown>
+</div>
   </div>
 )}
         
