@@ -709,6 +709,26 @@ const {
     });
     setIsCreatingMeeting(true);
   }
+  async function prepareMeeting(meeting: Meeting) {
+  try {
+    const response = await fetch(
+      `/api/intelligence/meeting?id=${encodeURIComponent(String(meeting.id))}`,
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Unable to prepare meeting intelligence.",
+      );
+    }
+
+    alert(data.intelligence);
+  } catch (error) {
+    console.error("Atlas meeting preparation error:", error);
+    alert("Atlas was unable to prepare this meeting. Please try again.");
+  }
+}
 
   function closeMeetingCreator() {
     setIsCreatingMeeting(false);
@@ -1638,27 +1658,39 @@ const labelStyle = {
                           </span>
 
                           <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "flex-end",
-                              gap: "10px",
-                              marginTop: "10px",
-                            }}
-                          >
-                            <button
-                              onClick={() => openMeetingEditor(meeting)}
-                              style={rowActionStyle}
-                            >
-                              Edit
-                            </button>
+  style={{
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "10px",
+    marginTop: "10px",
+  }}
+>
+  <button
+  type="button"
+  onClick={() => prepareMeeting(meeting)}
+  style={{
+    ...rowActionStyle,
+    color: "#31577D",
+    fontWeight: 700,
+  }}
+>
+  Prepare
+</button>
 
-                            <button
-                              onClick={() => deleteMeeting(meeting)}
-                              style={{ ...rowActionStyle, color: "#985C5C" }}
-                            >
-                              Delete
-                            </button>
-                          </div>
+  <button
+    onClick={() => openMeetingEditor(meeting)}
+    style={rowActionStyle}
+  >
+    Edit
+  </button>
+
+  <button
+    onClick={() => deleteMeeting(meeting)}
+    style={{ ...rowActionStyle, color: "#985C5C" }}
+  >
+    Delete
+  </button>
+</div>
                         </div>
                       </div>
                     );
