@@ -516,6 +516,12 @@ const {
   const [formError, setFormError] = useState("");
   const [editingMeetingId, setEditingMeetingId] =
   useState<string | number | null>(null);
+
+  const [meetingIntelligence, setMeetingIntelligence] = useState("");
+const [intelligenceMeeting, setIntelligenceMeeting] =
+  useState<Meeting | null>(null);
+const [isPreparingMeeting, setIsPreparingMeeting] = useState(false);
+
   const [isMounted, setIsMounted] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
@@ -710,6 +716,10 @@ const {
     setIsCreatingMeeting(true);
   }
   async function prepareMeeting(meeting: Meeting) {
+  setIntelligenceMeeting(meeting);
+  setMeetingIntelligence("");
+  setIsPreparingMeeting(true);
+
   try {
     const response = await fetch(
       `/api/intelligence/meeting?id=${encodeURIComponent(String(meeting.id))}`,
@@ -723,11 +733,20 @@ const {
       );
     }
 
-    alert(data.intelligence);
+    setMeetingIntelligence(data.intelligence);
   } catch (error) {
     console.error("Atlas meeting preparation error:", error);
-    alert("Atlas was unable to prepare this meeting. Please try again.");
+    setMeetingIntelligence(
+      "Atlas was unable to prepare this meeting. Please try again.",
+    );
+  } finally {
+    setIsPreparingMeeting(false);
   }
+}
+function closeMeetingIntelligence() {
+  setIntelligenceMeeting(null);
+  setMeetingIntelligence("");
+  setIsPreparingMeeting(false);
 }
 
   function closeMeetingCreator() {
