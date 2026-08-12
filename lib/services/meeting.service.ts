@@ -55,6 +55,23 @@ export async function getMeetings() {
   return data ?? [];
 }
 
+export async function getMeeting(id: string) {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("*")
+    .eq("id", id)
+    .eq("organization_id", getOrganizationId())
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
 export async function createMeeting(meeting: CreateMeetingInput) {
   const supabase = createAdminClient();
 
