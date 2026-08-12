@@ -2499,6 +2499,178 @@ const labelStyle = {
           </div>
         </div>
       )}
+            {(isPreparingMeeting || meetingIntelligence) && (
+        <div
+          onMouseDown={(event) => {
+            if (
+              event.currentTarget === event.target &&
+              !isPreparingMeeting
+            ) {
+              closeMeetingIntelligence();
+            }
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 70,
+            display: "grid",
+            placeItems: "center",
+            padding: "24px",
+            backgroundColor: "rgba(17, 24, 39, 0.42)",
+            backdropFilter: "blur(7px)",
+          }}
+        >
+          <div
+            style={{
+              boxSizing: "border-box",
+              width: "100%",
+              maxWidth: "720px",
+              maxHeight: "86vh",
+              overflowY: "auto",
+              padding: "38px",
+              borderRadius: "28px",
+              backgroundColor: "#FFFFFF",
+              boxShadow: "0 30px 90px rgba(17, 24, 39, 0.22)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "24px",
+                alignItems: "flex-start",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    marginBottom: "10px",
+                    color: "#31577D",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Atlas Intelligence
+                </div>
+
+                <h2
+                  style={{
+                    margin: 0,
+                    color: "#172235",
+                    fontSize: "28px",
+                    lineHeight: 1.2,
+                    fontWeight: 700,
+                  }}
+                >
+                  Pre-Meeting Brief
+                </h2>
+
+                {intelligenceMeeting && (
+                  <p
+                    style={{
+                      margin: "10px 0 0",
+                      color: "#7B8493",
+                      fontSize: "15px",
+                    }}
+                  >
+                    {intelligenceMeeting.title}
+                  </p>
+                )}
+              </div>
+
+              {!isPreparingMeeting && (
+                <button
+                  type="button"
+                  onClick={closeMeetingIntelligence}
+                  aria-label="Close meeting intelligence"
+                  style={{
+                    border: 0,
+                    backgroundColor: "transparent",
+                    color: "#8A93A3",
+                    fontSize: "26px",
+                    lineHeight: 1,
+                    cursor: "pointer",
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div
+              style={{
+                height: "1px",
+                margin: "26px 0",
+                backgroundColor: "#E8EDF2",
+              }}
+            />
+
+            {isPreparingMeeting ? (
+              <div
+                style={{
+                  padding: "42px 0",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#31577D",
+                    fontSize: "16px",
+                    fontWeight: 700,
+                  }}
+                >
+                  Atlas is preparing your briefing...
+                </div>
+
+                <p
+                  style={{
+                    margin: "10px 0 0",
+                    color: "#8A93A3",
+                    fontSize: "14px",
+                  }}
+                >
+                  Reviewing the meeting context and identifying what deserves
+                  your attention.
+                </p>
+              </div>
+            ) : (
+              <div
+                style={{
+                  whiteSpace: "pre-wrap",
+                  color: "#344256",
+                  fontSize: "15px",
+                  lineHeight: 1.7,
+                }}
+              >
+                {meetingIntelligence}
+              </div>
+            )}
+
+            {!isPreparingMeeting && (
+              <button
+                type="button"
+                onClick={closeMeetingIntelligence}
+                style={{
+                  width: "100%",
+                  marginTop: "30px",
+                  padding: "14px 18px",
+                  border: 0,
+                  borderRadius: "14px",
+                  backgroundColor: "#203F67",
+                  color: "#FFFFFF",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
