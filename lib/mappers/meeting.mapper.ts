@@ -36,6 +36,7 @@ export type AtlasMeeting = {
   id: string | number;
   date: string;
   time: string;
+  timezone: string;
   durationMinutes: number;
   title: string;
   subtitle: string;
@@ -55,6 +56,7 @@ export function mapDatabaseMeetingToAtlas(
     id: meeting.id,
     date: meeting.meeting_date,
     time: meeting.start_time.slice(0, 5),
+    timezone: meeting.timezone ?? "Europe/Zurich",
     durationMinutes: meeting.duration_minutes ?? 60,
     title: meeting.title,
     subtitle: meeting.subtitle ?? "",

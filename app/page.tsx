@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { DateTime } from "luxon";
 
 import { useMeetings } from "@/lib/hooks/useMeetings";
 import { deleteMeeting as deleteMeetingApi } from "@/lib/api/meetings";
@@ -70,16 +71,25 @@ const meetingStatuses: { value: MeetingStatus; label: string; symbol: string }[]
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
+function meetingStartDate(
+  meeting: Pick<Meeting, "date" | "time" | "timezone">,
+) {
+  const meetingDateTime = DateTime.fromISO(
+    `${meeting.date}T${meeting.time}`,
+    {
+      zone: meeting.timezone || "Europe/Zurich",
+    },
+  );
 
-function meetingStartDate(meeting: Pick<Meeting, "date" | "time">) {
-  const [year, month, day] = meeting.date.split("-").map(Number);
-  const [hour, minute] = meeting.time.split(":").map(Number);
-
-  return new Date(year, month - 1, day, hour, minute, 0, 0);
+  return meetingDateTime.toJSDate();
 }
 
+
 function meetingEndDate(
-  meeting: Pick<Meeting, "date" | "time" | "durationMinutes">,
+  meeting: Pick<
+    Meeting,
+    "date" | "time" | "timezone" | "durationMinutes"
+  >,
 ) {
   const end = meetingStartDate(meeting);
   end.setMinutes(end.getMinutes() + meeting.durationMinutes);
@@ -92,6 +102,22 @@ function formatClockTime(date: Date) {
     minute: "2-digit",
     hour12: false,
   }).format(date);
+}
+function formatLocalTimeZone(date: Date) {
+  return DateTime.fromJSDate(date).toFormat("ZZZZ");
+}
+
+function formatMeetingTimeRange(
+  meeting: Pick<
+    Meeting,
+    "date" | "time" | "timezone" | "durationMinutes"
+  >,
+) {
+  const start = meetingStartDate(meeting);
+  const end = meetingEndDate(meeting);
+  const timezone = formatLocalTimeZone(start);
+
+  return `${formatClockTime(start)}–${formatClockTime(end)} ${timezone}`;
 }
 function meetingDateOnly(date: string) {
   const [year, month, day] = date.split("-").map(Number);
@@ -163,6 +189,7 @@ type Meeting = {
   id: string | number;
   date: string;
   time: string;
+  timezone: string;
   durationMinutes: number;
   title: string;
   subtitle: string;
@@ -212,6 +239,7 @@ const initialMeetings: Meeting[] = [
     id: 1,
     date: todayIso(),
     time: "09:00",
+    timezone: "Europe/Zurich",
     durationMinutes: 45,
     title: "Cherry Ventures",
     subtitle: "Series A Investment Discussion",
@@ -226,6 +254,7 @@ const initialMeetings: Meeting[] = [
     id: 2,
     date: todayIso(),
     time: "11:30",
+    timezone: "Europe/Zurich",
     durationMinutes: 60,
     title: "Engineering Strategy",
     subtitle: "Product and infrastructure priorities",
@@ -240,6 +269,7 @@ const initialMeetings: Meeting[] = [
     id: 3,
     date: todayIso(),
     time: "14:00",
+    timezone: "Europe/Zurich",
     durationMinutes: 25,
     title: "Adani Investment",
     subtitle: "Strategic investment discussion",
@@ -254,6 +284,7 @@ const initialMeetings: Meeting[] = [
     id: 4,
     date: todayIso(),
     time: "16:00",
+    timezone: "Europe/Zurich",
     durationMinutes: 45,
     title: "Founder Review",
     subtitle: "Decisions, blockers, and next steps",
@@ -271,6 +302,7 @@ const initialCompleted: Meeting[] = [
     id: 101,
     date: todayIso(),
     time: "08:00",
+    timezone: "Europe/Zurich",
     durationMinutes: 30,
     title: "Founder Stand-up",
     subtitle: "Priorities, decisions, and immediate blockers",
@@ -286,6 +318,7 @@ const initialCompleted: Meeting[] = [
     id: 102,
     date: todayIso(),
     time: "08:45",
+    timezone: "Europe/Zurich",
     durationMinutes: 30,
     title: "Legal Review",
     subtitle: "Document and compliance review",
@@ -1121,9 +1154,7 @@ const labelStyle = {
                             fontWeight: 800,
                           }}
                         >
-                          {currentMeeting.time}–{formatClockTime(
-                            meetingEndDate(currentMeeting),
-                          )}
+                          {formatMeetingTimeRange(currentMeeting)}
                         </span>
                         <span
                           style={{
@@ -1347,9 +1378,7 @@ const labelStyle = {
                                     : formatDuration(secondsUntilStart)}
                             </span>
                             <span>
-                              {currentMeeting.time}–{formatClockTime(
-                                meetingEndDate(currentMeeting),
-                              )}
+                              {formatMeetingTimeRange(currentMeeting)}
                             </span>
                           </div>
                         </div>
@@ -1544,11 +1573,16 @@ const labelStyle = {
         ? "in-progress"
         : "scheduled";
 
-                    const relativeDate = getRelativeMeetingDate(
-                      meeting.date,
-                      now,
-                    );
-                    const fullDate = getFullMeetingDate(meeting.date);
+                    const localMeetingDate = DateTime.fromJSDate(
+  meetingStartDate(meeting),
+).toFormat("yyyy-MM-dd");
+
+const relativeDate = getRelativeMeetingDate(
+  localMeetingDate,
+  now,
+);
+
+const fullDate = getFullMeetingDate(localMeetingDate);
 
                     return (
                       <div
@@ -1594,9 +1628,7 @@ const labelStyle = {
                               color: "#1E3A5F",
                             }}
                           >
-                            {meeting.time}–{formatClockTime(
-                              meetingEndDate(meeting),
-                            )}
+                            {formatMeetingTimeRange(meeting)}
                           </p>
 
                           <p
@@ -1872,7 +1904,7 @@ const labelStyle = {
                           color: "#9AA2AE",
                         }}
                       >
-                        {meeting.time}
+                        {formatClockTime(meetingStartDate(meeting))}
                       </span>
 
                       <div>
@@ -1906,9 +1938,7 @@ const labelStyle = {
                             fontWeight: 600,
                           }}
                         >
-                          {meeting.time}–{formatClockTime(
-                            meetingEndDate(meeting),
-                          )} · {meeting.durationMinutes} min
+                          {formatMeetingTimeRange(meeting)} · {meeting.durationMinutes} min
                         </p>
                       </div>
                     </div>
@@ -2054,10 +2084,11 @@ const labelStyle = {
                     Ends{" "}
                     {formatClockTime(
                       meetingEndDate({
-                        date: newMeeting.date,
-                        time: newMeeting.time,
-                        durationMinutes: newMeeting.durationMinutes,
-                      }),
+  date: newMeeting.date,
+  time: newMeeting.time,
+  timezone: "Europe/Zurich",
+  durationMinutes: newMeeting.durationMinutes,
+}),
                     )}
                   </span>
                 )}

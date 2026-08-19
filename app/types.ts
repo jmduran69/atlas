@@ -39,6 +39,7 @@ export type Meeting = {
   id: string | number;
   date: string;
   time: string;
+  timezone: string;
   durationMinutes: number;
   title: string;
   subtitle: string;
