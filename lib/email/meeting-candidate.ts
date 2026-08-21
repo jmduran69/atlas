@@ -50,7 +50,33 @@ function monthNumber(month: string): string | null {
 
   return months[month.slice(0, 3).toLowerCase()] ?? null;
 }
+function normalizeGmtOffset(offset: string): string {
+  const match = offset.match(/^([+-])(\d{1,2})(?::(\d{2}))?$/);
 
+  if (!match) {
+    return "UTC";
+  }
+
+  const [, sign, hourText, minuteText] = match;
+
+  const hours = Number(hourText);
+  const minutes = Number(minuteText ?? "0");
+
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    hours > 14 ||
+    minutes > 59
+  ) {
+    return "UTC";
+  }
+
+  if (minutes === 0) {
+    return `UTC${sign}${hours}`;
+  }
+
+  return `UTC${sign}${hours}:${String(minutes).padStart(2, "0")}`;
+}
 export async function extractMeetingCandidate(
   email: EmailMessageContent,
 ): Promise<EmailMeetingCandidate | null> {
@@ -128,7 +154,7 @@ export async function extractMeetingCandidate(
     date,
     startTime,
     endTime,
-    timezone: `GMT${offset}`,
+    timezone: normalizeGmtOffset(offset),
     durationMinutes: endMinutes - startMinutes,
     meetingType: zoomUrl ? "zoom" : "other",
     destination: zoomUrl,

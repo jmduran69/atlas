@@ -7,11 +7,14 @@ type CreateMeetingInput = {
   objective?: string;
   meeting_date: string;
   start_time: string;
+  timezone?: string;
   duration_minutes?: number | null;
   meeting_type?: string | null;
   meeting_category?: string | null;
   destination?: string | null;
   lifecycle_status?: string;
+  source?: string | null;
+  external_event_id?: string | null;
 };
 
 type UpdateMeetingInput = {
@@ -21,11 +24,14 @@ type UpdateMeetingInput = {
   objective?: string;
   meeting_date?: string;
   start_time?: string;
+  timezone?: string;
   duration_minutes?: number | null;
   meeting_type?: string | null;
   meeting_category?: string | null;
   destination?: string | null;
   lifecycle_status?: string;
+  source?: string | null;
+  external_event_id?: string | null;
 };
 
 function getOrganizationId() {
@@ -85,11 +91,14 @@ export async function createMeeting(meeting: CreateMeetingInput) {
       objective: meeting.objective ?? null,
       meeting_date: meeting.meeting_date,
       start_time: meeting.start_time,
+      timezone: meeting.timezone ?? "Europe/Zurich",
       duration_minutes: meeting.duration_minutes ?? 60,
       meeting_type: meeting.meeting_type ?? null,
       meeting_category: meeting.meeting_category ?? null,
       destination: meeting.destination ?? null,
       lifecycle_status: meeting.lifecycle_status ?? "scheduled",
+      source: meeting.source ?? null,
+      external_event_id: meeting.external_event_id ?? null,
     })
     .select()
     .single();
@@ -133,6 +142,10 @@ export async function updateMeeting(
     updates.start_time = meeting.start_time;
   }
 
+  if (meeting.timezone !== undefined) {
+    updates.timezone = meeting.timezone;
+  }
+
   if (meeting.duration_minutes !== undefined) {
     updates.duration_minutes = meeting.duration_minutes;
   }
@@ -152,6 +165,14 @@ export async function updateMeeting(
 
   if (meeting.lifecycle_status !== undefined) {
     updates.lifecycle_status = meeting.lifecycle_status;
+  }
+
+  if (meeting.source !== undefined) {
+    updates.source = meeting.source;
+  }
+
+  if (meeting.external_event_id !== undefined) {
+    updates.external_event_id = meeting.external_event_id;
   }
 
   const { data, error } = await supabase
@@ -181,4 +202,25 @@ export async function deleteMeeting(id: string) {
   if (error) {
     throw new Error(error.message);
   }
+}
+
+export async function findMeetingByExternalEventId(
+  source: string,
+  externalEventId: string,
+) {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("*")
+    .eq("organization_id", getOrganizationId())
+    .eq("source", source)
+    .eq("external_event_id", externalEventId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
 }
