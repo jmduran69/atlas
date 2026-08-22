@@ -782,6 +782,9 @@ function closeMeetingIntelligence() {
   setIsPreparingMeeting(false);
 }
 
+  const [meetingPendingDeleteId, setMeetingPendingDeleteId] =
+    useState<string | null>(null);
+
   function closeMeetingCreator() {
     setIsCreatingMeeting(false);
     setEditingMeetingId(null);
@@ -790,21 +793,24 @@ function closeMeetingIntelligence() {
   }
 
   async function deleteMeeting(meeting: Meeting) {
-  const confirmed = window.confirm(
-    `Delete “${meeting.title}” from Atlas? This cannot be undone.`,
-  );
+    const meetingId = String(meeting.id);
 
-  if (!confirmed) return;
+    if (meetingPendingDeleteId !== meetingId) {
+      setMeetingPendingDeleteId(meetingId);
+      return;
+    }
 
-  try {
-    await deleteMeetingApi(String(meeting.id));
-    await reloadMeetings();
-    setIsExpanded(false);
-  } catch (error) {
-    console.error(error);
-    alert("Unable to delete the meeting. Please try again.");
+    try {
+      await deleteMeetingApi(meetingId);
+      await reloadMeetings();
+      setMeetingPendingDeleteId(null);
+      setIsExpanded(false);
+    } catch (error) {
+      console.error(error);
+      setMeetingPendingDeleteId(null);
+      alert("Unable to delete the meeting. Please try again.");
+    }
   }
-}
 
   async function createMeeting(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1445,7 +1451,9 @@ const labelStyle = {
                               cursor: "pointer",
                             }}
                           >
-                            Delete
+                            {meetingPendingDeleteId === String(currentMeeting.id)
+                              ? "Confirm Delete"
+                              : "Delete"}
                           </button>
 
                           <button
@@ -1739,7 +1747,9 @@ const fullDate = getFullMeetingDate(localMeetingDate);
     onClick={() => deleteMeeting(meeting)}
     style={{ ...rowActionStyle, color: "#985C5C" }}
   >
-    Delete
+    {meetingPendingDeleteId === String(meeting.id)
+      ? "Confirm Delete"
+      : "Delete"}
   </button>
 </div>
                         </div>

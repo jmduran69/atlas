@@ -97,7 +97,7 @@ export async function createMeeting(meeting: CreateMeetingInput) {
       meeting_category: meeting.meeting_category ?? null,
       destination: meeting.destination ?? null,
       lifecycle_status: meeting.lifecycle_status ?? "scheduled",
-      source: meeting.source ?? null,
+      source: meeting.source ?? "atlas",
       external_event_id: meeting.external_event_id ?? null,
     })
     .select()
