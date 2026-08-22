@@ -5,12 +5,29 @@ import type {
   EmailMessageContent,
 } from "./types";
 
-function extractZoomUrl(text: string): string {
-  const match = text.match(
-    /https?:\/\/(?:[\w.-]+\.)?zoom\.us\/[^\s<>"']+/i,
-  );
+function cleanUrl(url: string): string {
+  return url
+    .replace(/&amp;/gi, "&")
+    .replace(/[)\]}>.,;]+$/g, "")
+    .trim();
+}
 
-  return match?.[0] ?? "";
+function extractZoomUrl(text: string): string {
+  const patterns = [
+    /https?:\/\/(?:[\w.-]+\.)?zoom\.us\/j\/[^\s<>"']+/i,
+    /https?:\/\/(?:[\w.-]+\.)?zoom\.us\/wc\/[^\s<>"']+/i,
+    /https?:\/\/(?:[\w.-]+\.)?zoom\.us\/[^\s<>"']+/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+
+    if (match?.[0]) {
+      return cleanUrl(match[0]);
+    }
+  }
+
+  return "";
 }
 
 function normalizeTime(
@@ -22,13 +39,11 @@ function normalizeTime(
   const minute = Number(minuteText);
 
   if (meridiem) {
-    const normalizedMeridiem = meridiem.toLowerCase();
-
-    if (normalizedMeridiem === "pm" && hour !== 12) {
+    if (meridiem.toLowerCase() === "pm" && hour !== 12) {
       hour += 12;
     }
 
-    if (normalizedMeridiem === "am" && hour === 12) {
+    if (meridiem.toLowerCase() === "am" && hour === 12) {
       hour = 0;
     }
   }
@@ -95,29 +110,41 @@ function normalizeGmtOffset(offset: string): string {
   return `UTC${sign}${hours}:${String(minutes).padStart(2, "0")}`;
 }
 
-function normalizeNamedTimezone(timezone: string): string {
-  const normalized = timezone.trim().toUpperCase();
+function normalizeTimezone(timezone: string): string {
+  const value = timezone.trim();
 
-  const timezones: Record<string, string> = {
-    UTC: "UTC",
-    GMT: "UTC",
-    CET: "UTC+1",
+  const knownZones: Record<string, string> = {
     CEST: "UTC+2",
-    EET: "UTC+2",
-    EEST: "UTC+3",
-    IST: "UTC+5:30",
-    BST: "UTC+1",
-    EST: "UTC-5",
-    EDT: "UTC-4",
-    CST: "UTC-6",
-    CDT: "UTC-5",
-    MST: "UTC-7",
-    MDT: "UTC-6",
-    PST: "UTC-8",
+    CET: "UTC+1",
     PDT: "UTC-7",
+    PST: "UTC-8",
+    EDT: "UTC-4",
+    EST: "UTC-5",
+    BST: "UTC+1",
+    GMT: "UTC",
+    UTC: "UTC",
+    IST: "UTC+5:30",
   };
 
-  return timezones[normalized] ?? normalized;
+  const upper = value.toUpperCase();
+
+  if (knownZones[upper]) {
+    return knownZones[upper];
+  }
+
+  if (/^UTC[+-]/i.test(value)) {
+    return value.toUpperCase();
+  }
+
+  if (/^GMT[+-]/i.test(value)) {
+    return value.replace(/^GMT/i, "UTC");
+  }
+
+  if (/zurich/i.test(value)) {
+    return "Europe/Zurich";
+  }
+
+  return value;
 }
 
 function calculateDuration(
@@ -139,6 +166,43 @@ function calculateDuration(
   return endMinutes - startMinutes;
 }
 
+function buildCandidate(
+  email: EmailMessageContent,
+  input: {
+    title: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    timezone: string;
+    durationMinutes: number;
+    combinedContent: string;
+    platformHint?: string;
+  },
+): EmailMeetingCandidate {
+  const zoomUrl = extractZoomUrl(input.combinedContent);
+
+  const zoomDetected =
+    Boolean(zoomUrl) ||
+    /zoom/i.test(input.platformHint ?? "") ||
+    /\bzoom\b/i.test(input.combinedContent);
+
+  return {
+    sourceUid: email.uid,
+    sourceMessageId: email.messageId,
+    title: input.title.trim(),
+    date: input.date,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    timezone: input.timezone,
+    durationMinutes: input.durationMinutes,
+    meetingType: zoomDetected ? "zoom" : "other",
+    destination: zoomUrl,
+    from: email.from,
+    to: email.to,
+    confidence: zoomUrl ? "high" : "medium",
+  };
+}
+
 export async function extractMeetingCandidate(
   email: EmailMessageContent,
 ): Promise<EmailMeetingCandidate | null> {
@@ -150,26 +214,21 @@ export async function extractMeetingCandidate(
     typeof parsed.html === "string" ? parsed.html : "";
 
   const combinedContent = `${subject}\n${plainText}\n${htmlText}`;
-  const zoomUrl = extractZoomUrl(combinedContent);
 
   /*
    * FORMAT 1
    *
-   * Calendar-style invitation where the scheduling metadata
-   * appears directly in the subject.
+   * Google / calendar invitation subject:
    *
-   * Example:
-   *
-   * Updated invitation: Prooftree/General Catalyst
-   * @ Tue Aug 25, 2026 12:15pm - 12:45pm
-   * (GMT+5:30)
+   * Invitation: Meeting Name @ Tue Aug 25, 2026
+   * 12:15pm - 12:45pm (GMT+5:30)
    */
-  const subjectInvitationPattern =
+  const invitationPattern =
     /(?:updated\s+invitation|invitation):\s*(.+?)\s*@\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+([A-Za-z]{3,9})\s+(\d{1,2}),\s*(\d{4})\s+(\d{1,2}):(\d{2})(am|pm)\s*-\s*(\d{1,2}):(\d{2})(am|pm)\s*\(GMT([+-]\d{1,2}(?::\d{2})?)\)/i;
 
-  const subjectMatch = subject.match(subjectInvitationPattern);
+  const invitationMatch = subject.match(invitationPattern);
 
-  if (subjectMatch) {
+  if (invitationMatch) {
     const [
       ,
       rawTitle,
@@ -183,138 +242,206 @@ export async function extractMeetingCandidate(
       endMinute,
       endMeridiem,
       offset,
-    ] = subjectMatch;
+    ] = invitationMatch;
 
     const month = monthNumber(monthText);
 
-    if (!month) {
-      return null;
+    if (month) {
+      const date =
+        `${yearText}-${month}-${String(Number(dayText)).padStart(2, "0")}`;
+
+      const startTime = normalizeTime(
+        startHour,
+        startMinute,
+        startMeridiem,
+      );
+
+      const endTime = normalizeTime(
+        endHour,
+        endMinute,
+        endMeridiem,
+      );
+
+      return buildCandidate(email, {
+        title: rawTitle,
+        date,
+        startTime,
+        endTime,
+        timezone: normalizeGmtOffset(offset),
+        durationMinutes: calculateDuration(
+          startTime,
+          endTime,
+        ),
+        combinedContent,
+      });
     }
-
-    const date =
-      `${yearText}-${month}-${String(Number(dayText)).padStart(2, "0")}`;
-
-    const startTime = normalizeTime(
-      startHour,
-      startMinute,
-      startMeridiem,
-    );
-
-    const endTime = normalizeTime(
-      endHour,
-      endMinute,
-      endMeridiem,
-    );
-
-    return {
-      sourceUid: email.uid,
-      sourceMessageId: email.messageId,
-      title: rawTitle.trim(),
-      date,
-      startTime,
-      endTime,
-      timezone: normalizeGmtOffset(offset),
-      durationMinutes: calculateDuration(startTime, endTime),
-      meetingType: zoomUrl ? "zoom" : "other",
-      destination: zoomUrl,
-      from: email.from,
-      to: email.to,
-      confidence: zoomUrl ? "high" : "medium",
-    };
   }
 
   /*
    * FORMAT 2
    *
-   * Human-readable invitation where the meeting information
-   * appears in the plain-text body.
-   *
-   * Example:
+   * Human / structured meeting email:
    *
    * Meeting title: Atlas Automatic Meeting Test
    * Date: Thursday, 27 August 2026
    * Time: 18:00 CEST
+   * Duration: 30 minutes
+   * Platform: Zoom
    */
-  const bodyTitleMatch = plainText.match(
-    /^Meeting title:\s*(.+)$/im,
+  const structuredTitleMatch = plainText.match(
+    /Meeting\s+title:\s*(.+)/i,
   );
 
-  const bodyDateMatch = plainText.match(
-    /^Date:\s*(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+)?(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})\s*$/im,
+  const structuredDateMatch = plainText.match(
+    /Date:\s*(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*)?(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i,
   );
 
-  const bodyTimeMatch = plainText.match(
-    /^Time:\s*(\d{1,2}):(\d{2})(?:\s*-\s*(\d{1,2}):(\d{2}))?\s+([A-Za-z]{2,6})\s*$/im,
+  const structuredTimeMatch = plainText.match(
+    /Time:\s*(\d{1,2}):(\d{2})\s*([A-Za-z]+(?:[+-]\d+(?::\d+)?)?)/i,
+  );
+
+  const structuredDurationMatch = plainText.match(
+    /Duration:\s*(\d+)\s*(?:minutes?|mins?)/i,
+  );
+
+  const structuredPlatformMatch = plainText.match(
+    /Platform:\s*(.+)/i,
   );
 
   if (
-    bodyTitleMatch &&
-    bodyDateMatch &&
-    bodyTimeMatch
+    structuredTitleMatch &&
+    structuredDateMatch &&
+    structuredTimeMatch
   ) {
-    const rawTitle = bodyTitleMatch[1].trim();
-
-    const dayText = bodyDateMatch[1];
-    const monthText = bodyDateMatch[2];
-    const yearText = bodyDateMatch[3];
+    const [, dayText, monthText, yearText] =
+      structuredDateMatch;
 
     const month = monthNumber(monthText);
 
-    if (!month) {
-      return null;
+    if (month) {
+      const startTime = normalizeTime(
+        structuredTimeMatch[1],
+        structuredTimeMatch[2],
+      );
+
+      const durationMinutes = structuredDurationMatch
+        ? Number(structuredDurationMatch[1])
+        : 60;
+
+      const startTotal =
+        Number(startTime.slice(0, 2)) * 60 +
+        Number(startTime.slice(3, 5));
+
+      const endTotal = startTotal + durationMinutes;
+
+      const endHour =
+        Math.floor((endTotal % (24 * 60)) / 60);
+
+      const endMinute = endTotal % 60;
+
+      const endTime =
+        `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
+
+      const date =
+        `${yearText}-${month}-${String(Number(dayText)).padStart(2, "0")}`;
+
+      return buildCandidate(email, {
+        title: structuredTitleMatch[1].trim(),
+        date,
+        startTime,
+        endTime,
+        timezone: normalizeTimezone(
+          structuredTimeMatch[3],
+        ),
+        durationMinutes,
+        combinedContent,
+        platformHint:
+          structuredPlatformMatch?.[1] ?? "",
+      });
     }
+  }
 
-    const date =
-      `${yearText}-${month}-${String(Number(dayText)).padStart(2, "0")}`;
+  /*
+   * FORMAT 3
+   *
+   * Native Zoom invitation:
+   *
+   * Juan Duran is inviting you to a scheduled Zoom meeting.
+   *
+   * Topic: Test Meeting
+   * Time: Sep 2, 2026 01:00 AM Zurich
+   * Join Zoom Meeting
+   * https://us02web.zoom.us/j/...
+   */
+  const zoomTopicMatch = plainText.match(
+    /^Topic:\s*(.+)$/im,
+  );
 
-    const startTime = normalizeTime(
-      bodyTimeMatch[1],
-      bodyTimeMatch[2],
-    );
+  const zoomTimeMatch = plainText.match(
+    /^Time:\s*([A-Za-z]{3,9})\s+(\d{1,2}),\s*(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)\s+(.+)$/im,
+  );
 
-    const explicitEndTime =
-      bodyTimeMatch[3] && bodyTimeMatch[4]
-        ? normalizeTime(
-            bodyTimeMatch[3],
-            bodyTimeMatch[4],
-          )
-        : null;
+  const zoomUrl = extractZoomUrl(combinedContent);
 
-    const durationMinutes = explicitEndTime
-      ? calculateDuration(startTime, explicitEndTime)
-      : 60;
+  if (zoomTopicMatch && zoomTimeMatch && zoomUrl) {
+    const [
+      ,
+      monthText,
+      dayText,
+      yearText,
+      hourText,
+      minuteText,
+      meridiem,
+      timezoneText,
+    ] = zoomTimeMatch;
 
-    const endDate = new Date(
-      `2000-01-01T${startTime}:00Z`,
-    );
+    const month = monthNumber(monthText);
 
-    endDate.setUTCMinutes(
-      endDate.getUTCMinutes() + durationMinutes,
-    );
+    if (month) {
+      const startTime = normalizeTime(
+        hourText,
+        minuteText,
+        meridiem,
+      );
 
-    const endTime =
-      `${String(endDate.getUTCHours()).padStart(2, "0")}:` +
-      `${String(endDate.getUTCMinutes()).padStart(2, "0")}`;
+      /*
+       * Native Zoom invitation emails normally do not
+       * include the scheduled duration in the body.
+       * Until Atlas receives duration from a calendar
+       * object/API, default these invitations to 60 min.
+       */
+      const durationMinutes = 60;
 
-    const timezone = normalizeNamedTimezone(
-      bodyTimeMatch[5],
-    );
+      const startTotal =
+        Number(startTime.slice(0, 2)) * 60 +
+        Number(startTime.slice(3, 5));
 
-    return {
-      sourceUid: email.uid,
-      sourceMessageId: email.messageId,
-      title: rawTitle,
-      date,
-      startTime,
-      endTime,
-      timezone,
-      durationMinutes,
-      meetingType: zoomUrl ? "zoom" : "other",
-      destination: zoomUrl,
-      from: email.from,
-      to: email.to,
-      confidence: zoomUrl ? "high" : "medium",
-    };
+      const endTotal = startTotal + durationMinutes;
+
+      const endHour =
+        Math.floor((endTotal % (24 * 60)) / 60);
+
+      const endMinute = endTotal % 60;
+
+      const endTime =
+        `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
+
+      const date =
+        `${yearText}-${month}-${String(Number(dayText)).padStart(2, "0")}`;
+
+      return buildCandidate(email, {
+        title: zoomTopicMatch[1].trim(),
+        date,
+        startTime,
+        endTime,
+        timezone: normalizeTimezone(
+          timezoneText.trim(),
+        ),
+        durationMinutes,
+        combinedContent,
+        platformHint: "zoom",
+      });
+    }
   }
 
   return null;
